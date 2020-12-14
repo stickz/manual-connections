@@ -117,15 +117,30 @@ if [ "$PIA_DNS" == true ]; then
   echo start this script without PIA_DNS.
   dnsSettingForVPN="DNS = $dnsServer"
 fi
+
+export sys_gateway=$(/sbin/ip route | awk '/default/ { print $3 }')
+export sys_interface=$(/sbin/ip route | awk '/default/ { print $5 }')
+
 echo "
 [Interface]
 Address = $(echo "$wireguard_json" | jq -r '.peer_ip')
 PrivateKey = $privKey
 DNS= 1.1.1.1
+
+PostUp = ip -4 route del default via "$sys_gateway" dev "$sys_interface" proto static onlink
+PostUp = ip -4 route add default via "$sys_gateway" dev "$sys_interface" proto static onlink table ssh
+PostUp = ip -4 rule add fwmark 0x2 table ssh
+PostUp = /sbin/iptables -A OUTPUT -t mangle -o pia -p tcp --sport 22 -j MARK --set-mark 2
+
+PreDown = /sbin/iptables -D OUTPUT -t mangle -o pia -p tcp --sport 22 -j MARK --set-mark 2
+PreDown = ip -4 rule del fwmark 0x2 table ssh
+PreDown = ip -4 route del default via "$sys_gateway" dev "$sys_interface" proto static onlink table ssh
+PreDown = ip -4 route add default via "$sys_gateway" dev "$sys_interface" proto static onlink
+
 [Peer]
 PersistentKeepalive = 25
 PublicKey = $(echo "$wireguard_json" | jq -r '.server_key')
-AllowedIPs = $(echo "$wireguard_json" | jq -r '.peer_ip')/32
+AllowedIPs = 0.0.0.0/0
 Endpoint = ${WG_SERVER_IP}:$(echo "$wireguard_json" | jq -r '.server_port')
 " > /etc/wireguard/pia.conf || exit 1
 echo OK!
