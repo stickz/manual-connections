@@ -121,11 +121,11 @@ echo "
 [Interface]
 Address = $(echo "$wireguard_json" | jq -r '.peer_ip')
 PrivateKey = $privKey
-$dnsSettingForVPN
+DNS= 1.1.1.1
 [Peer]
 PersistentKeepalive = 25
 PublicKey = $(echo "$wireguard_json" | jq -r '.server_key')
-AllowedIPs = 0.0.0.0/0
+AllowedIPs = $(echo "$wireguard_json" | jq -r '.peer_ip')/32
 Endpoint = ${WG_SERVER_IP}:$(echo "$wireguard_json" | jq -r '.server_port')
 " > /etc/wireguard/pia.conf || exit 1
 echo OK!
